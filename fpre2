@@ -1,0 +1,60 @@
+import numpy as np  
+from keras.models import Sequential  
+from keras.layers import LSTM, Dense  
+from sklearn.preprocessing import MinMaxScaler  
+from sklearn.model_selection import train_test_split  
+import matplotlib.pyplot as plt  
+  
+# 模拟数据生成函数  
+def generate_data(num_samples, seq_length, seed=0):  
+    np.random.seed(seed)  
+    X = np.random.rand(num_samples, seq_length, 1) * 100  # 模拟降水量数据  
+    y = 3 * X[:, -1, :] + 50 + np.random.randn(num_samples, 1) * 20  # 模拟河流流量数据  
+    return X, y  
+  
+# 参数设置  
+num_samples = 1000  
+seq_length = 10  
+  
+# 生成模拟数据  
+X, y = generate_data(num_samples, seq_length)  
+  
+# 数据标准化  
+scaler_X = MinMaxScaler()  
+scaler_y = MinMaxScaler()  
+  
+X_scaled = scaler_X.fit_transform(X.reshape(-1, 1)).reshape(X.shape)  
+y_scaled = scaler_y.fit_transform(y)  
+  
+# 划分训练集和测试集  
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_scaled, test_size=0.2, random_state=42)  
+  
+# 重塑输入数据以适应LSTM的输入要求：[samples, time steps, features]  
+X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))  
+X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))  
+  
+# 创建LSTM模型  
+model = Sequential()  
+model.add(LSTM(50, activation='relu', input_shape=(seq_length, 1)))  
+model.add(Dense(1))  
+model.compile(optimizer='adam', loss='mean_squared_error')  
+  
+# 训练模型  
+model.fit(X_train, y_train, epochs=100, batch_size=32, verbose=1)  
+  
+# 进行预测  
+y_pred_scaled = model.predict(X_test)  
+  
+# 反标准化预测值和真实值  
+y_pred_inv = scaler_y.inverse_transform(y_pred_scaled)  
+y_test_inv = scaler_y.inverse_transform(y_test)  
+  
+# 绘制实际值和预测值对比图  
+plt.figure(figsize=(10, 5))  
+plt.plot(y_test_inv, label='Actual River Flow')  
+plt.plot(y_pred_inv, label='Predicted River Flow', linestyle='--')  
+plt.xlabel('Sample Index')  
+plt.ylabel('River Flow (scaled)')  
+plt.title('Actual vs Predicted River Flow')  
+plt.legend()  
+plt.show()
