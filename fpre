@@ -1,0 +1,110 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 示例数据（假设有历史的降水量和河流流量数据，扩展至30组数据）
+data = {
+    'date': ['2023-01-01', '2023-01-02', '2023-01-03', '2023-01-04', '2023-01-05',
+             '2023-01-06', '2023-01-07', '2023-01-08', '2023-01-09', '2023-01-10',
+             '2023-01-11', '2023-01-12', '2023-01-13', '2023-01-14', '2023-01-15',
+             '2023-01-16', '2023-01-17', '2023-01-18', '2023-01-19', '2023-01-20',
+             '2023-01-21', '2023-01-22', '2023-01-23', '2023-01-24', '2023-01-25',
+             '2023-01-26', '2023-01-27', '2023-01-28', '2023-01-29', '2023-01-30'],
+    'rainfall': [20, 15, 30, 10, 25,
+                 18, 22, 28, 12, 27,
+                 16, 19, 31, 11, 24,
+                 21, 14, 29, 13, 26,
+                 17, 23, 32, 9, 33,
+                 35, 37, 34, 36, 38],  # 降水量（示例数据）
+    'river_flow': [100, 110, 150, 120, 160,
+                   105, 108, 155, 115, 165,
+                   102, 112, 158, 122, 168,
+                   98, 107, 152, 118, 162,
+                   103, 109, 157, 121, 170,
+                   175, 180, 172, 178, 185]  # 河流流量（示例数据，受降水影响）
+}
+
+# 超参数
+input_size = 1   # 输入特征数量（降水量）
+output_size = 1  # 输出特征数量（河流流量）
+hidden_size = 10 # 隐藏层大小
+
+# 将数据转换为NumPy数组
+rainfall = np.array(data['rainfall'], dtype=float).reshape(-1, 1)
+river_flow = np.array(data['river_flow'], dtype=float).reshape(-1, 1)
+
+# 数据标准化
+rainfall_normalized = (rainfall - np.mean(rainfall)) / np.std(rainfall)
+river_flow_normalized = (river_flow - np.mean(river_flow)) / np.std(river_flow)
+
+# 定义RNN模型
+def rnn_forward(X, h_prev, Wx, Wh, Wy, bh, by):
+    h_next = np.tanh(np.dot(X, Wx) + np.dot(h_prev, Wh) + bh)
+    y_pred = np.dot(h_next, Wy) + by
+    return h_next, y_pred
+
+# 初始化参数
+np.random.seed(0)
+Wx = np.random.randn(input_size, hidden_size)
+Wh = np.random.randn(hidden_size, hidden_size)
+Wy = np.random.randn(hidden_size, output_size)
+bh = np.zeros((1, hidden_size))
+by = np.zeros((1, output_size))
+
+# 训练模型
+h_prev = np.zeros((1, hidden_size))
+learning_rate = 0.01
+epochs = 1000
+
+for epoch in range(epochs):
+    for i in range(len(rainfall_normalized)):
+        X = rainfall_normalized[i].reshape(1, 1)
+        y_true = river_flow_normalized[i].reshape(1, 1)
+        
+        h_prev, y_pred = rnn_forward(X, h_prev, Wx, Wh, Wy, bh, by)
+        
+        # 计算损失和梯度
+        loss = np.square(y_pred - y_true).sum()
+        
+        # 反向传播
+        dy = y_pred - y_true
+        dWy = np.dot(h_prev.T, dy)
+        dby = dy
+        dh = np.dot(dy, Wy.T) * (1 - np.square(h_prev))
+        dWh = np.dot(h_prev.T, dh)
+        dWx = np.dot(X.T, dh)
+        dbh = dh
+        
+        # 更新参数
+        Wx -= learning_rate * dWx
+        Wh -= learning_rate * dWh
+        Wy -= learning_rate * dWy
+        bh -= learning_rate * dbh
+        by -= learning_rate * dby
+        
+    if epoch % 100 == 0:
+        print(f'Epoch {epoch}, Loss: {loss}')
+
+# 预测
+h_prev = np.zeros((1, hidden_size))
+predictions = []
+
+for i in range(len(rainfall_normalized)):
+    X = rainfall_normalized[i].reshape(1, 1)
+    h_prev, y_pred = rnn_forward(X, h_prev, Wx, Wh, Wy, bh, by)
+    predictions.append(y_pred[0, 0])
+
+# 反标准化预测值
+predictions = np.array(predictions) * np.std(river_flow) + np.mean(river_flow)
+
+# 绘制预测结果
+plt.figure(figsize=(12, 6))
+plt.plot(data['date'], river_flow, marker='o', label='True values')
+plt.plot(data['date'], predictions, marker='x', linestyle='--', color='r', label='Predicted values')
+plt.title('prediction based on RNN')
+plt.xlabel('日')
+plt.ylabel('河流流量')
+plt.legend()
+plt.xticks(rotation=45)
+plt.grid(True)
+plt.tight_layout()
+plt.show()
